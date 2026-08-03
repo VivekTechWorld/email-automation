@@ -1,0 +1,141 @@
+ArtCloud Asiakaspalvelun Toimintaraamit – Yhteenveto
+Asiakaspalvelun päätavoite
+ArtCloudin asiakaspalvelun ensisijainen tavoite on ohjata asiakas ratkaisemaan yleisimmät ongelmat mahdollisimman pitkälle itse selkeiden käyttöohjeiden, dokumentaation ja vaiheittaisten toimintaohjeiden avulla.
+Teknisissä vioissa, palvelukatkoissa, ympäristöongelmissa tai palvelininfrastruktuuriin liittyvissä tilanteissa ArtCloud toimii aktiivisena ongelman ratkaisijana.
+
+Toimintamalli
+1. Itsepalvelu ensin
+Asiakasta pyritään ohjaamaan:
+    • käyttöohjeisiin
+    • dokumentaatioon
+    • vaiheittaisiin ratkaisuihin
+    • asiakasportaalin toimintoihin
+    • WordPressin omiin hallintatyökaluihin
+2. Tekninen tuki rajataan selkeästi
+ArtCloudin vastuulle kuuluvat erityisesti:
+    • palvelinympäristöjen viat
+    • verkkopalveluiden häiriöt
+    • DNS- ja nimipalvelinongelmat
+    • hosting-ympäristöjen virheet
+    • käyttökatkot
+    • järjestelmätason ongelmat
+3. Kehitystarpeiden tunnistaminen
+Kaikista asiakastilanteista pyritään tunnistamaan:
+    • toistuvat ongelmat
+    • puuttuvat ohjeet
+    • automatisoitavat vastaukset
+    • käyttöliittymän epäselvyydet
+    • koulutustarpeet
+
+Käytössä olevat ohjesivustot
+Vihreät-teema
+https://vihreatohjeet.artcloud.fi
+SDP-teema
+https://sdpohjeet.artcloud.fi
+ArtCloud / WordPress-ohjeet
+https://wordpressohjeet.artcloud.fi
+
+Yleisimmät asiakaspalvelutilanteet
+1. WordPressin käyttö
+Tyypillisiä aiheita:
+    • sivujen muokkaus
+    • kuvien lisääminen
+    • valikoiden hallinta
+    • uutisten julkaisu
+    • käyttäjätunnukset
+2. Verkkotunnukset ja DNS
+Tyypillisiä aiheita:
+    • nimipalvelinten vaihto
+    • DNS-tietueet
+    • domainin liittäminen palveluun
+    • sähköpostien ohjaukset
+3. Webhotelli ja sähköposti
+Tyypillisiä aiheita:
+    • sähköpostilaatikon luonti
+    • levytilarajat
+    • cPanel-käyttö
+    • FTP-yhteydet
+    • PHP-versiot
+4. Asiakasportaali
+Tyypillisiä aiheita:
+    • kirjautuminen
+    • palveluiden näkyminen
+    • tilausten hallinta
+    • käyttäjäoikeudet
+5. Tekninen häiriötilanne
+Tyypillisiä aiheita:
+    • verkkosivusto ei avaudu
+    • SSL-virheet
+    • palvelinvirheet
+    • hitaus
+    • sähköpostihäiriöt
+
+Sanitoidut asiakastilanteet ja mallivastaukset
+Asiakastilanne 1 – WordPress-sivun muokkaus
+Asiakkaan viesti
+“En löydä mistä voin muokata etusivun tekstiä WordPressissä.”
+Asiakaspalvelun vastaus
+Hei,
+Etusivun sisältöä voidaan yleensä muokata WordPressin Sivut-osiosta.
+Toimi seuraavasti:
+    1. Kirjaudu WordPress-hallintaan
+    2. Valitse vasemmasta valikosta “Sivut”
+    3. Avaa “Etusivu”
+    4. Tee tarvittavat muutokset
+    5. Tallenna “Päivitä”-painikkeella
+Mikäli sivusto käyttää Elementor- tai muuta sivunrakentajaa, sisältö avataan “Muokkaa Elementorilla” -painikkeesta.
+Lisäohjeet: https://wordpressohjeet.artcloud.fi
+
+Asiakastilanne 2 – DNS-muutos
+Asiakkaan viesti
+“Vaihdoin nimipalvelimet mutta verkkosivu ei vieläkään avaudu.”
+Asiakaspalvelun vastaus
+Hei,
+Nimipalvelinmuutosten päivittyminen internetiin voi kestää normaalisti muutamasta tunnista jopa 24–48 tuntiin.
+Tarkistathan lisäksi:
+    • että verkkotunnukselle on asetettu oikeat nimipalvelimet
+    • että DNS-tietueet löytyvät uudesta ympäristöstä
+    • ettei selaimessa ole vanhaa välimuistia
+Voit myös kokeilla sivustoa mobiiliverkon kautta tai toisella laitteella.
+Mikäli ongelma jatkuu 48 tunnin jälkeen, tarkistamme tilanteen teknisesti.
+
+Asiakastilanne 3 – Sähköpostin luonti
+Asiakkaan viesti
+“Miten teen uuden sähköpostiosoitteen?”
+Asiakaspalvelun vastaus
+Hei,
+Uuden sähköpostilaatikon voit luoda cPanelin kautta.
+Toimi seuraavasti:
+    1. Kirjaudu asiakasportaaliin
+    2. Avaa webhotellipalvelu
+    3. Siirry cPaneliin
+    4. Valitse “Email Accounts”
+    5. Luo uusi sähköpostiosoite ja salasana
+Suosittelemme käyttämään vahvaa salasanaa.
+Lisäohjeet: https://wordpressohjeet.artcloud.fi
+
+Asiakastilanne 4 – Asiakasportaalin kirjautumisongelma
+Asiakkaan viesti
+“En pääse kirjautumaan portaaliin vaikka salasana on oikein.”
+Asiakaspalvelun vastaus
+Hei,
+Suosittelemme ensin:
+    • tyhjentämään selaimen välimuistin
+    • kokeilemaan yksityistä selaustilaa
+    • tarkistamaan ettei selaimeen ole tallentunut vanhaa salasanaa
+Mikäli kirjautuminen ei tämän jälkeen onnistu, voit käyttää “Unohtuiko salasana” -toimintoa.
+Jos ongelma jatkuu edelleen, tarkistamme käyttäjätilin teknisesti.
+
+Asiakastilanne 5 – Verkkosivusto ei avaudu
+Asiakkaan viesti
+“Sivusto näyttää virheilmoitusta eikä avaudu ollenkaan.”
+Asiakaspalvelun vastaus
+Hei,
+Kyseessä vaikuttaa olevan tekninen häiriötilanne.
+Tarvitsemme tarkistusta varten:
+    • verkkotunnuksen
+    • mahdollisen virheilmoituksen tekstin
+    • tiedon siitä tapahtuuko ongelma kaikilla käyttäjillä
+Tekninen ylläpito tarkistaa palvelinympäristön ja tilanteen mahdollisimman nopeasti.
+Mikäli kyseessä on laajempi palveluhäiriö, tiedotamme siitä erikseen.
+

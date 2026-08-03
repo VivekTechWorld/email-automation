@@ -1,0 +1,67 @@
+Customer situation 1 – Editing a WordPress page
+Customer message
+“I can’t find where I can edit the front page text in WordPress.”
+Customer service response
+Hi,
+The front page content can usually be edited in the Pages section of WordPress.
+Do the following:
+1. Log in to your WordPress admin
+2. Select “Pages” from the left menu
+3. Open “Front Page”
+4. Make the necessary changes
+5. Save with the “Update” button
+If the site uses Elementor or another page builder, the content is opened with the “Edit with Elementor” button.
+Additional instructions: https://wordpressohjeet.artcloud.fi
+
+Customer situation 2 – DNS change
+Customer message
+“I changed the nameservers but the website still doesn’t open.”
+Customer service response
+Hi,
+It can normally take a few hours to 24–48 hours for nameserver changes to be updated to the internet.
+Please also check:
+• that the correct name servers have been set for the domain
+• that the DNS records can be found in the new environment
+• that there is no old cache in the browser
+You can also try the site via a mobile network or on another device.
+If the problem persists after 48 hours, we will check the situation technically.
+
+Customer Situation 3 – Creating an Email
+Customer Message
+“How do I create a new email address?”
+Customer Service Response
+Hi,
+You can create a new email account via cPanel.
+Follow these steps:
+1. Log in to the customer portal
+2. Open the web hosting service
+3. Go to cPanel
+4. Select “Email Accounts”
+5. Create a new email address and password
+We recommend using a strong password.
+Additional instructions: https://wordpressohjeet.artcloud.fi
+
+Customer Situation 4 – Customer Portal Login Problem
+Customer Message
+“I can’t log in to the portal even though my password is correct.”
+Customer Service Response
+Hi,
+We recommend first:
+• clearing your browser cache
+• trying private browsing mode
+• checking that no old password has been saved in the browser
+If you are still unable to log in, you can use the “Forgot your password” function.
+If the problem persists, we will check your account technically.
+
+Customer Situation 5 – Website not opening
+Customer message
+“The website is showing an error message and is not opening at all.”
+Customer Service Response
+Hi,
+This appears to be a technical problem.
+For the review, we need:
+• domain name
+• text of any error message
+• information about whether the problem is occurring for all users
+Technical maintenance will check the server environment and the situation as quickly as possible.
+If it is a wider service problem, we will inform you separately.

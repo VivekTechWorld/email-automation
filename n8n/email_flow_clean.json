@@ -1,0 +1,175 @@
+{
+  "name": "Auto Email Reply System",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [{ "mode": "everyMinute" }]
+        },
+        "simple": false,
+        "filters": {
+          "readStatus": "unread"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "position": [-800, 0],
+      "id": "a1b2c3d4-0001-0000-0000-000000000001",
+      "name": "Gmail — New Email",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "paT1SdYpVSmTE3T4",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "markAsRead",
+        "messageId": "={{ $json.id }}"
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [-560, 0],
+      "id": "a1b2c3d4-0006-0000-0000-000000000006",
+      "name": "Mark as Read",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "paT1SdYpVSmTE3T4",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8000/process-email",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "sender",     "value": "={{ $('Gmail — New Email').all()[$itemIndex].json.from.value[0].address }}" },
+            { "name": "subject",    "value": "={{ $('Gmail — New Email').all()[$itemIndex].json.subject || $('Gmail — New Email').all()[$itemIndex].json.Subject || '(no subject)' }}" },
+            { "name": "body",       "value": "={{ $('Gmail — New Email').all()[$itemIndex].json.text || $('Gmail — New Email').all()[$itemIndex].json.snippet || '' }}" },
+            { "name": "message_id", "value": "={{ $('Gmail — New Email').all()[$itemIndex].json.id }}" },
+            { "name": "thread_id",  "value": "={{ $('Gmail — New Email').all()[$itemIndex].json.threadId }}" }
+          ]
+        },
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-300, 0],
+      "id": "a1b2c3d4-0002-0000-0000-000000000002",
+      "name": "FastAPI — Process Email"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "check-alert",
+              "leftValue": "={{ $json.alert }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-40, 0],
+      "id": "a1b2c3d4-0003-0000-0000-000000000003",
+      "name": "Critical Alert?"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.alert_email }}",
+        "subject": "={{ $json.reply_subject }}",
+        "emailType": "html",
+        "message": "=<html><body><h2 style=\"color:#cc0000;\">CRITICAL ISSUE REPORTED</h2><table style=\"border-collapse:collapse;width:100%;font-family:sans-serif\"><tr><td style=\"padding:8px;font-weight:bold;\">From</td><td style=\"padding:8px;\">{{ $json.sender }}</td></tr><tr style=\"background:#f9f9f9\"><td style=\"padding:8px;font-weight:bold;\">Subject</td><td style=\"padding:8px;\">{{ $json.subject }}</td></tr><tr><td style=\"padding:8px;font-weight:bold;\">Category</td><td style=\"padding:8px;\">{{ $json.category }}</td></tr></table><hr/><h3>Original Message:</h3><blockquote style=\"border-left:4px solid #cc0000;padding-left:16px;color:#333;\">{{ $json.original_body }}</blockquote><hr/><p style=\"color:#555;\">This alert was automatically generated. Please respond immediately.</p></body></html>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [220, -140],
+      "id": "a1b2c3d4-0004-0000-0000-000000000004",
+      "name": "Send Critical Alert",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "paT1SdYpVSmTE3T4",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.sender }}",
+        "subject": "={{ $json.reply_subject }}",
+        "emailType": "text",
+        "message": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [220, 140],
+      "id": "a1b2c3d4-0005-0000-0000-000000000005",
+      "name": "Send Auto Reply",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "paT1SdYpVSmTE3T4",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Gmail — New Email": {
+      "main": [[{ "node": "Mark as Read", "type": "main", "index": 0 }]]
+    },
+    "Mark as Read": {
+      "main": [[{ "node": "FastAPI — Process Email", "type": "main", "index": 0 }]]
+    },
+    "FastAPI — Process Email": {
+      "main": [[{ "node": "Critical Alert?", "type": "main", "index": 0 }]]
+    },
+    "Critical Alert?": {
+      "main": [
+        [{ "node": "Send Critical Alert", "type": "main", "index": 0 }],
+        [{ "node": "Send Auto Reply",     "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}

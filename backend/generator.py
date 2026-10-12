@@ -1,8 +1,9 @@
-import ollama
-import json
-import re
 import os
+import re
+import json
+import logging
 from models.schemas import EmailRequest, ClassificationResult
+from provider import classify, generate, get_provider
 from rag.retriever import retrieve_context
 
 
@@ -17,6 +18,8 @@ LANG_CONFIG: dict[str, dict] = {
 
 DEFAULT_LANG = "en"
 
+log = logging.getLogger(__name__)
+
 
 def get_lang_info(lang: str) -> dict:
     """Return label + greeting for the given language code, defaulting to English."""
@@ -30,8 +33,8 @@ def _known_greeting_starts() -> tuple[str, ...]:
 
 # ── Prompts ───────────────────────────────────────────────────────────────────
 
-# CALL 1 — email-support-v2
-# Focused on classification ONLY. No response generation (that's qwen's job).
+# CALL 1 — classification
+# Focused on classification ONLY. No response generation (that's the generator's job).
 CLASSIFY_PROMPT = """\
 You are a professional email classifier for ArtCloud, a web hosting company.
 
@@ -73,10 +76,8 @@ Body: {body}\
 """
 
 
-# CALL 2 — qwen2.5:7b
-# Generation only. Receives language-matched context from ChromaDB.
-# IMPORTANT: Only called when context is non-empty. Empty-context replies
-# are handled by UNKNOWN_TOPIC_TEMPLATES below — no LLM involved.
+# CALL 2 — generation
+# Receives language-matched context from ChromaDB.
 RAG_PROMPT = """\
 You are a professional customer support agent for ArtCloud, a web hosting company.
 
@@ -127,7 +128,6 @@ Reply (plain text only):\
 """
 
 # Injected into RAG_PROMPT when ChromaDB returns no relevant chunks.
-# The LLM still runs — this block overrides its behaviour via the prompt.
 NO_CONTEXT_NOTE = """
 CRITICAL INSTRUCTION — NO KNOWLEDGE BASE CONTEXT WAS FOUND:
 You MUST NOT invent, guess, or assume any technical steps, URLs, account
@@ -147,25 +147,26 @@ Write nothing beyond this. Any invented detail is strictly forbidden.
 
 async def process_email_combined(
     email: EmailRequest,
-) -> tuple[str, str, str, str, bool]:
+) -> tuple[str, str, str, str, bool, int]:
     """
-    Two-call pipeline. Returns (category, severity, lang, reply_body, used_rag).
+    Two-call pipeline. Returns (category, severity, lang, reply_body, used_rag, confidence).
 
-    Call 1 — email-support-v2 (classifier):
+    Call 1 — classify():
         Determines category, severity, language, confidence, needs_context.
-        Temperature 0 for deterministic classification.
+        Routes to Ollama or Gemini based on active provider.
 
-    Call 2 — qwen2.5:7b (generator):
+    Call 2 — generate():
         Writes the actual reply.
         Uses ChromaDB context (language-filtered) when needs_context=True
         or confidence is below the threshold.
         If ChromaDB returns nothing → graceful fallback reply.
     """
-    classify_model   = os.getenv("LLM_MODEL",               "email-support-v2")
-    rag_model        = os.getenv("RAG_MODEL",                "qwen2.5:7b")
     min_confidence   = int(os.getenv("MIN_CONFIDENCE_THRESHOLD", "2"))
     company_name     = os.getenv("COMPANY_NAME",             "Support Team")
     default_lang     = os.getenv("DEFAULT_LANG",             "en")
+
+    active_provider = get_provider()
+    log.info("Processing email via provider: %s", active_provider)
 
     # ── CALL 1 — Classify ─────────────────────────────────────────────────────
     classify_prompt = CLASSIFY_PROMPT.format(
@@ -173,14 +174,8 @@ async def process_email_combined(
         body=email.body[:800],
     )
 
-    clf_response = ollama.chat(
-        model=classify_model,
-        messages=[{"role": "user", "content": classify_prompt}],
-        options={"temperature": 0},
-        keep_alive="60m",
-    )
+    raw = classify(classify_prompt)
 
-    raw = clf_response["message"]["content"].strip()
     # Strip markdown code fences some models add
     raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.MULTILINE)
     raw = re.sub(r"```\s*$",          "", raw, flags=re.MULTILINE)
@@ -247,20 +242,15 @@ async def process_email_combined(
         body=email.body[:1200],
     )
 
-    gen_response = ollama.chat(
-        model=rag_model,
-        messages=[{"role": "user", "content": rag_prompt}],
-        options={"temperature": 0.3},
-        keep_alive="60m",
-    )
+    reply_raw = generate(rag_prompt)
 
     reply = clean_response(
-        gen_response["message"]["content"],
+        reply_raw,
         greeting=greeting,
         company_name=company_name,
     )
 
-    return category, severity, lang, reply, used_rag
+    return category, severity, lang, reply, used_rag, confidence
 
 
 # ── Response cleaner ──────────────────────────────────────────────────────────
@@ -333,5 +323,5 @@ def clean_response(text: str, greeting: str, company_name: str) -> str:
 async def generate_response(
     email: EmailRequest, classification: ClassificationResult
 ) -> tuple[str, bool]:
-    _, _, _, reply, used_rag = await process_email_combined(email)
+    _, _, _, reply, used_rag, _ = await process_email_combined(email)
     return reply, used_rag

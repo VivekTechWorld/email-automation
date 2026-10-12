@@ -2,8 +2,9 @@
 
 # Helper script to load the 7B model from Colab into Ollama
 
-PROJECT_DIR="/home/parthiv/web/Email Automation"
-DOWNLOADS_DIR="$HOME/Downloads"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="${EMAIL_PROJECT_DIR:-$SCRIPT_DIR}"
+DOWNLOADS_DIR="${DOWNLOADS_DIR:-$HOME/Downloads}"
 MODEL_DEST="$PROJECT_DIR/data/finetuned/email-support-7b.gguf"
 MODEL_NAME="email-support-7b"
 

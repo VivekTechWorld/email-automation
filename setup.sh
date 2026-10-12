@@ -41,9 +41,16 @@ echo "Models ready."
 # ── 4. Python virtual environment ────────────────────────────────
 echo ""
 echo "[4/5] Setting up Python environment..."
-cd "$(dirname "$0")/backend"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR/backend"
 
-python3.12 -m venv venv
+PYTHON_BIN="${PYTHON:-$(command -v python3.12 || command -v python3 || command -v python)}"
+if [ -z "$PYTHON_BIN" ]; then
+    echo "Error: Python is required but not found in PATH."
+    exit 1
+fi
+echo "Using Python: $($PYTHON_BIN --version)"
+$PYTHON_BIN -m venv venv
 source venv/bin/activate
 
 pip install --upgrade pip -q

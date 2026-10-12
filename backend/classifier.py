@@ -1,3 +1,11 @@
+"""
+ARCHIVED / LEGACY MODULE
+========================
+This module is unreferenced legacy code and is superseded by backend/generator.py
+(process_email_combined) which unifies email classification and reply generation.
+Retained for reference only.
+"""
+
 import ollama
 import json
 import re

@@ -13,6 +13,7 @@ class EmailRequest(BaseModel):
 class ClassificationResult(BaseModel):
     category: str   # sales | inquiry | billing | support | bug | other
     severity: str   # normal | high | critical
+    confidence: Optional[int] = None
 
 
 class EmailResponse(BaseModel):
@@ -27,3 +28,14 @@ class EmailResponse(BaseModel):
     body: str
     original_body: str
     used_rag: bool = False
+    status: str = "sent"                # sent | pending | approved | rejected
+    confidence: Optional[int] = None
+    log_id: Optional[int] = None
+
+
+class ApproveReviewRequest(BaseModel):
+    reply: Optional[str] = None
+
+
+class RejectReviewRequest(BaseModel):
+    reason: Optional[str] = None

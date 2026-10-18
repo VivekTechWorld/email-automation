@@ -1,21 +1,17 @@
 """
-indexer.py — ChromaDB Knowledge Base Indexer (optional)
-=========================================================
-This module is optional. If ChromaDB or Ollama are not installed/available,
-all functions return safe defaults so the rest of the backend can still run.
+indexer.py — ChromaDB vector index for the knowledge base (optional)
+=====================================================================
+Indexes the dashboard-managed articles (knowledge.py) into ChromaDB when
+chromadb + Ollama embeddings are installed. Without them every function is a
+no-op and the retriever uses keyword search instead.
 """
 
 import os
 import hashlib
 import logging
-from pathlib import Path
-from dotenv import load_dotenv
+import threading
 
-load_dotenv()
 log = logging.getLogger(__name__)
-
-SUPPORTED_EXTENSIONS = {".txt", ".md", ".pdf"}
-KNOWN_LANGS = {"en", "fi"}
 
 # ── Optional imports ──────────────────────────────────────────────────────────
 try:
@@ -24,7 +20,7 @@ try:
 except ImportError:
     _chromadb = None
     _CHROMA_AVAILABLE = False
-    log.warning("chromadb not installed — RAG ingestion disabled.")
+    log.info("chromadb not installed — vector search disabled (keyword search is used).")
 
 try:
     import ollama as _ollama
@@ -32,106 +28,110 @@ try:
 except ImportError:
     _ollama = None
     _OLLAMA_AVAILABLE = False
-    log.warning("ollama not installed — embedding disabled.")
+    log.info("ollama not installed — embeddings disabled.")
+
+_COLLECTION = "knowledge_base"
+_reindex_lock = threading.Lock()
 
 
-# ── Collection ────────────────────────────────────────────────────────────────
+def _client():
+    return _chromadb.PersistentClient(path=os.getenv("CHROMA_PERSIST_DIR", "../data/chroma_db"))
+
 
 def get_collection():
     if not _CHROMA_AVAILABLE:
-        raise RuntimeError("chromadb is not installed. RAG is disabled.")
-    persist_dir = os.getenv("CHROMA_PERSIST_DIR", "../data/chroma_db")
-    client = _chromadb.PersistentClient(path=persist_dir)
-    return client.get_or_create_collection(
-        name="knowledge_base",
-        metadata={"hnsw:space": "cosine"},
-    )
+        raise RuntimeError("chromadb is not installed. Vector search is disabled.")
+    return _client().get_or_create_collection(name=_COLLECTION, metadata={"hnsw:space": "cosine"})
 
-
-# ── Embeddings ────────────────────────────────────────────────────────────────
 
 def embed_text(text: str) -> list[float]:
     if not _OLLAMA_AVAILABLE:
         raise RuntimeError("ollama is not installed. Embeddings disabled.")
-    model = os.getenv("EMBED_MODEL", "nomic-embed-text")
-    response = _ollama.embeddings(model=model, prompt=text)
+    response = _ollama.embeddings(model=os.getenv("EMBED_MODEL", "nomic-embed-text"), prompt=text)
     return response["embedding"]
 
 
-# ── Language detection from filename ─────────────────────────────────────────
+def reindex_all() -> int:
+    """Rebuild the vector index from all knowledge-base articles. Returns chunk count."""
+    if not (_CHROMA_AVAILABLE and _OLLAMA_AVAILABLE):
+        return 0
+    import knowledge
 
-def detect_lang_from_filename(filename: str) -> str:
-    stem = Path(filename).stem
-    parts = stem.split("-")
-    last = parts[-1].lower()
-    if last in KNOWN_LANGS and len(parts) > 1:
-        return last
-    return os.getenv("DEFAULT_LANG", "en")
-
-
-# ── Chunking ──────────────────────────────────────────────────────────────────
-
-def chunk_text(text: str, chunk_size: int = 150, overlap: int = 30) -> list[str]:
-    words = text.split()
-    chunks = []
-    step = chunk_size - overlap
-    for i in range(0, len(words), step):
-        chunk = " ".join(words[i : i + chunk_size])
-        if len(chunk.strip()) > 30:
-            chunks.append(chunk)
-    return chunks
-
-
-# ── File reader ───────────────────────────────────────────────────────────────
-
-def read_file(file_path: Path) -> str:
-    if file_path.suffix.lower() == ".pdf":
+    with _reindex_lock:
+        client = _client()
         try:
-            import pdfplumber
-            with pdfplumber.open(file_path) as pdf:
-                return "\n".join(page.extract_text() or "" for page in pdf.pages)
-        except ImportError:
-            log.warning("pdfplumber not installed — skipping %s", file_path.name)
-            return ""
-    return file_path.read_text(encoding="utf-8", errors="ignore")
+            client.delete_collection(_COLLECTION)
+        except Exception:
+            pass
+        collection = get_collection()
 
-
-# ── Ingest ────────────────────────────────────────────────────────────────────
-
-async def ingest_documents(directory: str) -> int:
-    if not _CHROMA_AVAILABLE or not _OLLAMA_AVAILABLE:
-        raise RuntimeError(
-            "RAG ingestion requires chromadb + ollama. "
-            "These are unavailable on this platform. "
-            "Run ingestion from a Linux/WSL environment."
-        )
-
-    collection = get_collection()
-    base_path = Path(directory)
-
-    if not base_path.exists():
-        raise FileNotFoundError(f"Knowledge base directory not found: {directory}")
-
-    total_chunks = 0
-    for file_path in base_path.rglob("*"):
-        if file_path.suffix.lower() not in SUPPORTED_EXTENSIONS:
-            continue
-        try:
-            lang = detect_lang_from_filename(file_path.name)
-            text = read_file(file_path)
-            chunks = chunk_text(text)
-            for i, chunk in enumerate(chunks):
-                doc_id = hashlib.md5(f"{file_path.name}::{i}".encode()).hexdigest()
-                embedding = embed_text(chunk)
+        total = 0
+        for art in knowledge.all_articles_full():
+            for i, chunk in enumerate(knowledge.chunk_text(art["content"])):
                 collection.upsert(
-                    ids=[doc_id],
-                    embeddings=[embedding],
+                    ids=[hashlib.md5(f"{art['id']}::{i}".encode()).hexdigest()],
+                    embeddings=[embed_text(f"{art['title']}\n{chunk}")],
                     documents=[chunk],
-                    metadatas=[{"source": file_path.name, "chunk_index": i, "lang": lang}],
+                    metadatas=[{
+                        "article_id": art["id"],
+                        "title": art["title"],
+                        "category": art["category"],
+                        "lang": art["lang"],
+                    }],
                 )
-                total_chunks += 1
-            log.info("Ingested [%s]: %s (%d chunks)", lang, file_path.name, len(chunks))
-        except Exception as e:
-            log.error("Error ingesting %s: %s", file_path.name, e)
+                total += 1
+        log.info("Vector index rebuilt with %d chunks.", total)
+        return total
 
-    return total_chunks
+
+def reindex_in_background():
+    """Called after every knowledge-base change; never blocks the request."""
+    if not (_CHROMA_AVAILABLE and _OLLAMA_AVAILABLE):
+        return
+
+    def run():
+        try:
+            reindex_all()
+        except Exception as e:
+            log.warning("Background vector reindex failed: %s", e)
+
+    threading.Thread(target=run, daemon=True).start()
+
+
+def vector_search(query: str, lang: str, n_results: int) -> list[dict]:
+    """Returns hits as dicts with text/title/category/lang/score (higher is better)."""
+    collection = get_collection()
+    count = collection.count()
+    if count == 0:
+        return []
+
+    max_distance = float(os.getenv("RAG_MAX_DISTANCE", "1.0"))
+    embedding = embed_text(query)
+
+    def run(where):
+        kwargs = dict(
+            query_embeddings=[embedding],
+            n_results=min(n_results, count),
+            include=["documents", "metadatas", "distances"],
+        )
+        if where:
+            kwargs["where"] = where
+        res = collection.query(**kwargs)
+        return [
+            {
+                "text": doc,
+                "title": meta.get("title", ""),
+                "category": meta.get("category", "general"),
+                "lang": meta.get("lang", "en"),
+                # Convert distance to a score so it ranks like keyword results
+                "score": 10 * (1 - dist),
+            }
+            for doc, meta, dist in zip(res["documents"][0], res["metadatas"][0], res["distances"][0])
+            if dist <= max_distance
+        ]
+
+    try:
+        hits = run({"lang": lang})
+    except Exception:
+        hits = []
+    return hits or run(None)

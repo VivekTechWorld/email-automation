@@ -1,93 +1,73 @@
 import { useState } from 'react';
+import { Mail, LogIn } from 'lucide-react';
+import { login } from '../api';
 
-const EXPECTED_PASSPHRASE = import.meta.env.VITE_DASHBOARD_PASSWORD || 'admin123';
-
-export default function LoginGate({ onLogin }) {
+export default function LoginGate({ onLogin, notice }) {
   const [passphrase, setPassphrase] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-
     if (!passphrase.trim()) {
-      setError('Please enter the dashboard passphrase.');
+      setError('Please enter the dashboard password.');
       return;
     }
 
+    // The password is checked by the backend — it is never stored in this bundle.
     setLoading(true);
-
-    // Validate passphrase
-    if (passphrase === EXPECTED_PASSPHRASE) {
-      setTimeout(() => {
-        setLoading(false);
-        onLogin();
-      }, 250);
-    } else {
-      setTimeout(() => {
-        setLoading(false);
-        setError('Incorrect passphrase. Access denied.');
-      }, 300);
+    try {
+      await login(passphrase);
+      onLogin();
+    } catch (err) {
+      setError(err.message === 'Failed to fetch'
+        ? 'Cannot reach the backend. Is the API server running?'
+        : err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="login-overlay">
-      <div className="login-card">
-        <div className="login-header">
-          <div className="login-badge">🔒 Secure Access</div>
-          <div className="login-logo">✉️</div>
-          <h1 className="login-title">Email Automation</h1>
-          <p className="login-subtitle">ArtCloud · AI Operations Dashboard</p>
+    <div className="login-page">
+      <div className="card login-card">
+        <div className="login-head">
+          <div className="brand-mark"><Mail size={24} /></div>
+          <div className="login-title">Email Automation</div>
+          <div className="login-sub">Sign in to manage replies, leads and knowledge</div>
         </div>
 
         <form onSubmit={handleSubmit} className="login-form">
-          {error && (
-            <div className="login-error" role="alert">
-              <span>⚠️</span> {error}
-            </div>
-          )}
+          {error && <div className="notice error" role="alert">{error}</div>}
+          {!error && notice && <div className="notice info" role="status">{notice}</div>}
 
-          <div className="login-field">
-            <label htmlFor="dashboard-passphrase" className="login-label">
-              Passphrase
-            </label>
-            <div className="password-input-wrapper">
+          <div className="field">
+            <label htmlFor="dashboard-passphrase" className="field-label">Password</label>
+            <div className="password-wrap">
               <input
                 id="dashboard-passphrase"
                 type={showPassword ? 'text' : 'password'}
-                className="login-input"
-                placeholder="Enter passphrase..."
+                className="input"
+                placeholder="Enter password"
                 value={passphrase}
                 onChange={(e) => setPassphrase(e.target.value)}
                 autoFocus
                 autoComplete="current-password"
               />
-              <button
-                type="button"
-                className="password-toggle-btn"
-                onClick={() => setShowPassword((prev) => !prev)}
-                title={showPassword ? 'Hide password' : 'Show password'}
-              >
-                {showPassword ? '👁️' : '🙈'}
+              <button type="button" className="btn btn-ghost" onClick={() => setShowPassword((v) => !v)}>
+                {showPassword ? 'Hide' : 'Show'}
               </button>
             </div>
           </div>
 
-          <button
-            type="submit"
-            className="login-submit-btn"
-            disabled={loading}
-          >
-            {loading ? 'Verifying...' : 'Unlock Dashboard →'}
+          <button type="submit" className="btn btn-primary" disabled={loading}>
+            <LogIn size={16} />{loading ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
 
-        <div className="login-footer">
-          <span>Protected by API Key &amp; Session Authentication</span>
-        </div>
+        <div className="login-foot">Password is verified by the server · sessions expire automatically</div>
       </div>
     </div>
   );

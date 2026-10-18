@@ -67,3 +67,8 @@ Thumbs.db
 
 # Project Specific Generated Files
 /*-respons.json
+
+# Runtime data — contains real senders and email contents
+data/email_logs.db
+data/email_logs.db-*
+data/email_logs.jsonl

@@ -1,0 +1,24 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: email_automation_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    # All secrets and settings come from backend/.env (git-ignored).
+    env_file:
+      - ./backend/.env
+    # Only container-specific paths/hosts are overridden here. Do not add
+    # VAR=${VAR:-} lines: they replace the .env value with an empty string
+    # whenever VAR is not exported in your shell.
+    environment:
+      - OLLAMA_HOST=http://host.docker.internal:11434
+      - CHROMA_PERSIST_DIR=/app/data/chroma_db
+      - KNOWLEDGE_BASE_DIR=/app/data/knowledge_base
+      - EMAIL_DB_PATH=/app/data/email_logs.db
+    volumes:
+      - ./data:/app/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

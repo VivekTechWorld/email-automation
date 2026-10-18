@@ -1,164 +1,132 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { CheckCheck, Flame, Info, Timer, X, Send } from 'lucide-react';
+import { CategoryBadge, MoodBadge, Avatar, Empty } from './ui';
+import { formatDuration, timeAgo } from '../lib/format';
 
 /**
- * ReviewQueue — Interactive human review tab for low-confidence pending drafts
+ * ReviewQueue — emails held back from auto-sending (team handoff, low confidence,
+ * attachments, AI failures). Edit the draft, then approve or reject.
  */
-export default function ReviewQueue({ pendingLogs, onApprove, onReject }) {
-  const [editedReplies, setEditedReplies] = useState({});
-  const [submittingId, setSubmittingId] = useState(null);
+export default function ReviewQueue({ pendingLogs, settings, onApprove, onReject }) {
+  const [drafts, setDrafts] = useState({});
+  const [busyId, setBusyId] = useState(null);
+  const [now, setNow] = useState(() => Date.now());
 
-  const handleTextChange = (id, text) => {
-    setEditedReplies((prev) => ({
-      ...prev,
-      [id]: text,
-    }));
-  };
+  // Tick every 30s so the auto-reply countdowns stay current
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
 
-  const handleApprove = async (item) => {
-    const finalReply = editedReplies[item.id] !== undefined
-      ? editedReplies[item.id]
-      : item.reply_preview;
-
-    setSubmittingId(item.id);
+  const run = async (id, action) => {
+    setBusyId(id);
     try {
-      await onApprove(item.id, finalReply);
+      await action();
     } finally {
-      setSubmittingId(null);
+      setBusyId(null);
     }
   };
 
-  const handleReject = async (item) => {
-    setSubmittingId(item.id);
-    try {
-      await onReject(item.id);
-    } finally {
-      setSubmittingId(null);
-    }
-  };
-
-  if (!pendingLogs || pendingLogs.length === 0) {
+  if (!pendingLogs?.length) {
     return (
       <div className="card">
-        <div className="card-header">
-          <span className="card-title">⏳ Human Review Queue</span>
-          <span className="badge-count zero">0 Pending</span>
-        </div>
-        <div className="empty-state">
-          <div className="empty-icon">✨</div>
-          <div className="empty-title">Queue is clear!</div>
-          <div className="empty-desc">
-            All customer replies have met confidence criteria or have been reviewed.
-          </div>
-        </div>
+        <Empty icon={CheckCheck} title="Nothing to review">
+          Emails that need a person — sales handoffs, unclear questions, attachments — will appear here.
+        </Empty>
       </div>
     );
   }
 
   return (
-    <div className="card">
-      <div className="card-header">
-        <div>
-          <span className="card-title">⏳ Human Review Queue</span>
-          <span className="badge-count active" style={{ marginLeft: 8 }}>
-            {pendingLogs.length} Pending Approval
-          </span>
-        </div>
-        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-          Replies are held until approved
-        </span>
-      </div>
-
-      <div className="review-list">
-        {pendingLogs.map((item) => {
-          const currentText =
-            editedReplies[item.id] !== undefined
-              ? editedReplies[item.id]
-              : item.reply_preview || '';
-          const isBusy = submittingId === item.id;
-
-          return (
-            <div key={item.id} className="review-card">
-              <div className="review-header">
-                <div className="review-meta">
-                  <span className="review-id">#{item.id}</span>
-                  <span className="review-sender">{item.sender}</span>
-                  <span className={`cat-badge ${item.category}`}>
-                    {item.category}
-                  </span>
-                  <span className={`sev-badge ${item.severity}`}>
-                    {item.severity}
-                  </span>
-                </div>
-
-                <div className="review-flags">
-                  <span className="review-warn-pill">
-                    ⚠️ Low Confidence Gate
-                  </span>
-                  <span className="review-time">
-                    {formatTime(item.timestamp)}
-                  </span>
+    <div className="review-list">
+      {pendingLogs.map((item) => {
+        const text = drafts[item.id] ?? item.reply_preview ?? '';
+        const busy = busyId === item.id;
+        return (
+          <div key={item.id} className={`card review ${item.escalated ? 'escalated' : ''}`}>
+            <div className="review-top">
+              <div className="person">
+                <Avatar email={item.sender} />
+                <div className="person-text">
+                  <div className="review-subject">{item.subject || '(no subject)'}</div>
+                  <div className="review-from">{item.sender} · {timeAgo(item.timestamp)}</div>
                 </div>
               </div>
-
-              <div className="review-subject">
-                <strong>Subject:</strong> {item.subject || '(no subject)'}
+              <div className="review-tags">
+                <MoodBadge mood={item.mood} />
+                <CategoryBadge category={item.category} />
+                {item.severity !== 'normal' && (
+                  <span className={`badge cap tone-${item.severity === 'critical' ? 'red' : 'amber'}`}>{item.severity}</span>
+                )}
               </div>
+            </div>
 
-              <div className="review-body-section">
-                <label className="review-label" htmlFor={`reply-edit-${item.id}`}>
-                  Drafted AI Reply (Editable before sending):
-                </label>
-                <textarea
-                  id={`reply-edit-${item.id}`}
-                  className="review-textarea"
-                  rows={5}
-                  value={currentText}
-                  onChange={(e) => handleTextChange(item.id, e.target.value)}
-                  disabled={isBusy}
-                  placeholder="Review or customize response..."
-                />
+            {item.review_reason && (
+              <div className={`reason ${item.escalated ? 'red' : ''}`}>
+                {item.escalated ? <Flame size={15} /> : <Info size={15} />}
+                {reasonText(item.review_reason)}
               </div>
+            )}
+            {item.summary && <div className="profile-strip"><span>Summary: <b>{item.summary}</b></span></div>}
 
-              <div className="review-actions">
-                <button
-                  type="button"
-                  className="reject-btn"
-                  onClick={() => handleReject(item)}
-                  disabled={isBusy}
-                  title="Mark rejected and close without sending"
-                >
-                  ✕ Reject (Don't Send)
+            {item.original_body && (
+              <div>
+                <div className="detail-label">Customer wrote</div>
+                <div className="message">{item.original_body}</div>
+              </div>
+            )}
+
+            <div className="field">
+              <label className="detail-label" htmlFor={`draft-${item.id}`}>
+                {item.reply_preview ? 'AI draft — edit before sending' : 'No AI draft — write the reply'}
+              </label>
+              <textarea
+                id={`draft-${item.id}`}
+                className="textarea"
+                rows={Math.min(14, Math.max(6, text.split('\n').length + 1))}
+                value={text}
+                disabled={busy}
+                onChange={(e) => setDrafts((d) => ({ ...d, [item.id]: e.target.value }))}
+              />
+            </div>
+
+            <div className="review-actions">
+              <Countdown item={item} settings={settings} now={now} />
+              <div className="toolbar">
+                <button className="btn btn-danger" disabled={busy} onClick={() => run(item.id, () => onReject(item.id))}>
+                  <X size={15} />Reject
                 </button>
-
                 <button
-                  type="button"
-                  className="approve-btn"
-                  onClick={() => handleApprove(item)}
-                  disabled={isBusy}
-                  title="Approve reply and send to customer"
+                  className="btn btn-primary"
+                  disabled={busy || !text.trim()}
+                  onClick={() => run(item.id, () => onApprove(item.id, text))}
                 >
-                  {isBusy ? 'Processing...' : '✓ Approve & Send'}
+                  <Send size={15} />{busy ? 'Saving…' : 'Approve & send'}
                 </button>
               </div>
             </div>
-          );
-        })}
-      </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-function formatTime(iso) {
-  if (!iso) return '—';
-  try {
-    const d = new Date(iso);
-    return d.toLocaleString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch {
-    return iso;
-  }
+// The countdown is shown separately, so drop the backend's "— AI replies automatically…" suffix
+function reasonText(reason) {
+  return reason.split(' — AI replies automatically')[0];
+}
+
+function Countdown({ item, settings, now }) {
+  if (!settings) return <span />;
+  if (!item.reply_preview) return <span className="countdown"><Timer size={14} />Waiting for a person to write the reply</span>;
+  if (!settings.auto_reply_enabled) return <span className="countdown"><Timer size={14} />Auto-reply is off — waits for a person</span>;
+
+  const due = new Date(item.timestamp).getTime() + settings.auto_reply_timeout_hours * 3600_000;
+  const left = due - now;
+  return (
+    <span className={`countdown ${left < 3600_000 ? 'soon' : ''}`}>
+      <Timer size={14} />AI sends this draft in {formatDuration(left)} if nobody reviews it
+    </span>
+  );
 }

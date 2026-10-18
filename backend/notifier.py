@@ -19,7 +19,7 @@ log = logging.getLogger(__name__)
 
 def send_webhook_alert_sync(
     *,
-    event_type: str,  # "critical" | "pending"
+    event_type: str,  # "critical" | "pending" | "handoff"
     sender: str,
     subject: str,
     category: str,
@@ -37,7 +37,14 @@ def send_webhook_alert_sync(
         return False
 
     is_critical = event_type == "critical" or severity == "critical"
-    title = "🚨 CRITICAL EMAIL ESCALATION" if is_critical else "⏳ HUMAN REVIEW REQUIRED (Low Confidence)"
+    if is_critical:
+        title = "🚨 CRITICAL EMAIL ESCALATION"
+    elif event_type == "escalation":
+        title = "🔥 UNHAPPY CUSTOMER — PRIORITY"
+    elif event_type == "handoff":
+        title = f"🤝 {category.upper()} TEAM HANDOFF"
+    else:
+        title = "⏳ HUMAN REVIEW REQUIRED"
     
     text_message = (
         f"{title}\n"
